@@ -1,0 +1,36 @@
+nvm install stable
+nvm use stable
+
+npm install -g @angular/cli@17
+
+ng new dev-sec-ops-poc
+
+cd dev-sec-ops-poc
+
+ng serve --open
+
+
+give me github workflow actions for selfhosted runner that senses the code push and trigers the code scanning integrated to sonar cloud & trigers the qa automation with a github repo link, then also build and deploy the code in amazon ec2 instance and generate a jira ticket that this deployment has been happened and update all the posible logs and informations
+
+
+GitHub Actions workflow that integrates the following tasks for a self-hosted runner:
+
+    Triggers on code push.
+    Performs code scanning with SonarCloud.
+    Runs QA automation.
+    Builds and deploys the code to an Amazon EC2 instance.
+    Generates a Jira ticket for the deployment.
+    Updates Jira with all logs and information.
+
+    Required Secrets:
+
+    SONAR_TOKEN: SonarCloud authentication token.
+    EC2_SSH_KEY: SSH private key for accessing your EC2 instance.
+    JIRA_USER: Jira username or email.
+    JIRA_API_TOKEN: Jira API token.
+    EC2_IP: The IP address of your EC2 instance.
+
+Setup:
+
+    Replace your_sonar_project_key, your_organization, your_ec2_ip, PROJECT_KEY, and your_jira_domain with your actual values.
+    The deploy_script.sh should contain the necessary commands to deploy your application on the EC2 instance.
