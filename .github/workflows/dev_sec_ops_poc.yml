@@ -1,36 +1,77 @@
-# This is a basic workflow to help you get started with Actions
+name: CI/CD Pipeline with SonarCloud, QA, Deployment, and Jira Integration
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+  code_scan:
+    runs-on: self-hosted
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      - name: Set up JDK 11
+        uses: actions/setup-java@v3
+        with:
+          java-version: '11'
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=your_sonar_project_key
+            -Dsonar.organization=your_organization
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+  qa_automation:
+    runs-on: self-hosted
+    needs: code_scan
+    steps:
+      - name: Run QA Automation
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          # Install dependencies and run your QA tests
+          npm install
+          npm test
+
+  deploy:
+    runs-on: self-hosted
+    needs: qa_automation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to EC2
+        run: |
+          # SSH into EC2 and deploy
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_KEY }} ec2-user@your_ec2_ip "bash -s" < ./deploy_script.sh
+          
+      - name: Post Deployment Jira Ticket
+        run: |
+          curl -u ${{ secrets.JIRA_USER }}:${{ secrets.JIRA_API_TOKEN }} \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{
+              "fields": {
+                "project": { "key": "PROJECT_KEY" },
+                "summary": "Deployment to EC2 completed",
+                "description": "Deployment to EC2 instance IP: your_ec2_ip was successful. Logs are attached.",
+                "issuetype": { "name": "Task" }
+              }
+            }' \
+            https://your_jira_domain.atlassian.net/rest/api/2/issue/
+
+      - name: Update Jira with Logs
+        run: |
+          LOG_FILE=$(mktemp)
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_KEY }} ec2-user@your_ec2_ip "cat /path_to_your_logs/*.log" > $LOG_FILE
+          
+          curl -u ${{ secrets.JIRA_USER }}:${{ secrets.JIRA_API_TOKEN }} \
+            -X POST \
+            -H "X-Atlassian-Token: no-check" \
+            -F "file=@${LOG_FILE}" \
+            https://your_jira_domain.atlassian.net/rest/api/2/issue/PROJECT_KEY/attachments
